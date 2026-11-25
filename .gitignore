@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets
+.env
+.env.*
+
+# Data, indexes, raw results (large; regenerable; checksums live in data/MANIFEST.json)
+data/*
+!data/MANIFEST.json
+!data/README.md
+indexes/
+results/raw/
+results/cache/
+logs/
+
+# FAISS fork build tree (the source checkout's commit is recorded in reports/stage_04_build.md)
+third_party/faiss/
+third_party/*.tar.gz
+cpp/**/build/
+*.o
+*.so
+
+# OS / IDE
+.DS_Store
+*.swp
+.idea/
+.vscode/

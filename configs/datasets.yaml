@@ -1,0 +1,60 @@
+# Benchmark-suite registry (PLAN.md v5, Stage 1). Single source of truth for every dataset.
+#
+# Every set is materialized under data/sets/<name>/ as:
+#   base.npy (N x D float32), queries.npy (nq x D float32), gt.npz (ids int64, dist float32 =
+#   exact squared L2, top-100), labels.npz (density, quartiles, splits), spectrum.npz
+#   (per-order per-axis variance), pca.npz / rot.npz (rotations), meta.json.
+# Metric is L2 for every set (v5: Panorama and HNSW-RaBitQ are L2-only); unit-normalized sets
+# have L2 ranking == cosine ranking.
+#
+# roles: R* = real (v4 B1), S1/S2 = synthetic grids, X = scale/extra variants (E10, GIST-10K).
+# native_order: "mrl" = Matryoshka prefix order (MS MARCO); "none" = no meaningful order (the
+# paper's ordering for these is PCA).
+
+defaults:
+  k_gt: 100
+  n_splits: 20          # 50/50 calibration/test resamples (v5: 20, not 5)
+  split_seed: 20261125
+  rotation_seed: 7
+
+sets:
+  # ---- MS MARCO, Model A = OpenAI text-embedding-3-large (MRL, 1536-d), first 500K passages
+  msm-a-384:   {role: R1, family: text-mrl, source: msmarco, model: A, D: 384,  N: 500000, native_order: mrl, normalize: true}
+  msm-a-768:   {role: R2, family: text-mrl, source: msmarco, model: A, D: 768,  N: 500000, native_order: mrl, normalize: true}
+  msm-a-1024:  {role: R2b, family: text-mrl, source: msmarco, model: A, D: 1024, N: 500000, native_order: mrl, normalize: true}
+  msm-a-1536:  {role: R2c, family: text-mrl, source: msmarco, model: A, D: 1536, N: 500000, native_order: mrl, normalize: true}
+  # ---- MS MARCO, Model B = Qwen3-Embedding-0.6B (MRL, 1024-d), the same first 500K passages
+  msm-b-1024:  {role: R3, family: text-mrl, source: msmarco, model: B, D: 1024, N: 500000, native_order: mrl, normalize: true}
+
+  # ---- public benchmarks
+  sift-128:    {role: R4, family: image-sift, source: sift,  D: 128, N: 1000000, native_order: none, normalize: false}
+  gist-960:    {role: R5, family: image-gist, source: gist,  D: 960, N: 1000000, native_order: none, normalize: false}
+  glove-100:   {role: R6, family: word,       source: glove, D: 100, N: 1183514, native_order: none, normalize: true}
+  deep-96:     {role: R7, family: deep-image, source: deep,  D: 96,  N: 1000000, native_order: none, normalize: false}
+
+  # ---- extras: extended GIST queries (10K from the learn split; standard 1K stays primary)
+  gist-960-q10k: {role: X, family: image-gist, source: gist_learnq, base_from: gist-960, D: 960, N: 1000000, native_order: none, normalize: false, n_queries: 10000, query_seed: 11}
+
+  # ---- scale variants (E10). Model B has only 500K passages embedded, so the 1M point uses A.
+  msm-a-1024-100k: {role: X, family: text-mrl, source: subsample, parent: msm-a-1024, D: 1024, N: 100000, native_order: mrl, normalize: true, subsample_seed: 100}
+  msm-b-1024-100k: {role: X, family: text-mrl, source: subsample, parent: msm-b-1024, D: 1024, N: 100000, native_order: mrl, normalize: true, subsample_seed: 100}
+  msm-a-1024-1m:   {role: X, family: text-mrl, source: msmarco, model: A, D: 1024, N: 1000000, native_order: mrl, normalize: true}
+  deep-96-10m:     {role: X, family: deep-image, source: deep, D: 96, N: 10000000, native_order: none, normalize: false}
+
+# Synthetic grids, expanded by nestbench.datasets (names s1-d{D}-b{beta}, s2-d{D}-c{C}-z{s}).
+synthetic:
+  s1:  # Gaussian, lambda_i ∝ i^-beta, randomly rotated; beta=0 is the negative control
+    D: [128, 512, 1024]
+    beta: [0, 0.5, 1, 2]
+    N: 1000000
+    n_queries: 10000
+    seed: 1000
+  s2:  # Gaussian mixture: centres with lambda ∝ i^-1 spectrum (rotated), Zipf(s) cluster sizes,
+       # isotropic within-cluster noise with log-uniform per-cluster scale
+    D: [128, 1024]
+    C: [100, 1000]
+    zipf_s: [0, 1]
+    scale_range: [0.1, 1.0]   # per-cluster noise std, relative to the mean per-axis centre std
+    N: 1000000
+    n_queries: 10000
+    seed: 2000
